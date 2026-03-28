@@ -1,0 +1,103 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/crawler-worker",
+    "crates/parsing-worker",
+    "crates/seed-loader",
+    "crates/queue-client",
+    "crates/storage-client",
+    "crates/cache-client",
+    "crates/domain",
+    "crates/config",
+]
+
+[workspace.dependencies]
+domain         = { path = "crates/domain" }
+config         = { path = "crates/config" }
+queue-client   = { path = "crates/queue-client" }
+storage-client = { path = "crates/storage-client" }
+cache-client   = { path = "crates/cache-client" }
+
+# ── Async runtime ──────────────────────────────────────────────────────────────
+tokio = { version = "1", features = ["full"] }
+ 
+# ── AWS SDK ────────────────────────────────────────────────────────────────────
+aws-config        = { version = "1", features = ["behavior-version-latest"] }
+aws-sdk-sqs       = "1"
+aws-sdk-s3        = "1"
+aws-sdk-dynamodb  = "1"
+ 
+# ── HTTP client ────────────────────────────────────────────────────────────────
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "deflate", "brotli"] }
+ 
+# ── HTML parsing ──────────────────────────────────────────────────────────────
+scraper   = "0.21"
+html5ever = "0.29"
+ 
+# ── Redis ─────────────────────────────────────────────────────────────────────
+redis          = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
+ 
+# ── URL handling ──────────────────────────────────────────────────────────────
+url = "2"
+ 
+# ── Hashing ───────────────────────────────────────────────────────────────────
+blake3 = "1"
+ 
+# ── DNS ───────────────────────────────────────────────────────────────────────
+hickory-resolver = { version = "0.24", features = ["tokio-runtime"] }
+ 
+# ── Serialization ─────────────────────────────────────────────────────────────
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+ 
+# ── Config / env loading ──────────────────────────────────────────────────────
+config-rs = { package = "config", version = "0.14" }
+envy      = "0.4"
+dotenvy   = "0.15"
+ 
+# ── Observability ─────────────────────────────────────────────────────────────
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+ 
+# ── Error handling ────────────────────────────────────────────────────────────
+thiserror = "2"
+anyhow    = "1"
+ 
+# ── Retry / backoff ───────────────────────────────────────────────────────────
+tokio-retry = "0.3"
+backoff     = { version = "0.4", features = ["tokio"] }
+ 
+# ── Misc ──────────────────────────────────────────────────────────────────────
+uuid    = { version = "1", features = ["v4"] }
+chrono  = { version = "0.4", features = ["serde"] }
+bytes   = "1"
+futures = "0.3"
+once_cell = "1"
+ 
+# ── Dev / test ────────────────────────────────────────────────────────────────
+[workspace.dev-dependencies]
+tokio-test  = "0.4"
+mockall     = "0.13"
+wiremock    = "0.6"
+fake        = { version = "2", features = ["derive"] }
+rstest      = "0.23"
+ 
+# ── Release profile (smaller + faster binary for prod) ────────────────────────
+[profile.release]
+opt-level     = 3
+lto           = "thin"
+codegen-units = 1
+strip         = "symbols"
+panic         = "abort"
+ 
+# ── Dev profile (faster incremental builds) ───────────────────────────────────
+[profile.dev]
+opt-level     = 0
+debug         = true
+incremental   = true
+ 
+# ── CI profile (balance between dev speed and catching UB) ───────────────────
+[profile.ci]
+inherits  = "dev"
+opt-level = 1
