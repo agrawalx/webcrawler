@@ -4,3 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+tokio = {workspace = true}
+reqwest = {workspace = true, features = ["rustls-tls", "native-tls"]}
+blake3 = {workspace = true}
+tracing = {workspace = true}
+tracing-subscriber = {workspace = true}
+domain = {workspace = true}
+config = {workspace = true}
+scraper = {workspace = true}
+url = {workspace = true}
