@@ -9,7 +9,9 @@ pub struct Settings {
     #[serde(default = "default_allowed_size")]
     pub maximum_allowed_size: u64, // represents size in bytes
     #[serde(default = "default_user_agent")]
-    pub user_agent: String
+    pub user_agent: String,
+    #[serde(default = "default_storage_dir")]
+    pub storage_base_dir: String,
 }
 fn default_timeout_secs() -> u64 {
     15
@@ -19,6 +21,9 @@ fn default_allowed_size() -> u64 {
 }
 fn default_user_agent() -> String {
     String::from("my-crawler/0.1")
+}
+fn default_storage_dir() -> String {
+    String::from("./crawl-data")
 }
 
 impl Settings {

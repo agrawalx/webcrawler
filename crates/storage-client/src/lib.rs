@@ -1,14 +1,50 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+use std::path::PathBuf;
+
+use domain::models::UrlMetaData;
+use tokio::fs::OpenOptions;
+use tokio::io::AsyncWriteExt;
+use tokio::sync::Mutex;
+
+#[derive(Debug, thiserror::Error)]
+pub enum StorageError {
+    #[error("Failed to write file: {0}")]
+    WriteError(#[from] std::io::Error),
+    #[error("Failed to serialize metadata: {0}")]
+    SerializeError(#[from] serde_json::Error),
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub struct DiskStorage {
+    base_dir: PathBuf,
+    metadata_file: Mutex<tokio::fs::File>,
+}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+impl DiskStorage {
+    pub async fn new(base_dir: &str) -> Result<Self, StorageError> {
+        let base_dir = PathBuf::from(base_dir);
+        tokio::fs::create_dir_all(&base_dir).await?;
+        let metadata_file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(base_dir.join("metadata.jsonl"))
+            .await?;
+        Ok(Self {
+            base_dir,
+            metadata_file: Mutex::new(metadata_file),
+        })
+    }
+
+    pub async fn store_html(&self, hash: &str, content: &[u8]) -> Result<String, StorageError> {
+        let path = self.base_dir.join(format!("{hash}.html"));
+        tokio::fs::write(&path, content).await?;
+        Ok(path.to_string_lossy().into_owned())
+    }
+
+    pub async fn save_metadata(&self, metadata: &UrlMetaData) -> Result<(), StorageError> {
+        let mut line = serde_json::to_string(metadata)?;
+        line.push('\n');
+        let mut file = self.metadata_file.lock().await;
+        file.write_all(line.as_bytes()).await?;
+        file.flush().await?;
+        Ok(())
     }
 }

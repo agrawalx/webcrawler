@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 tokio = {workspace = true}
-reqwest = {workspace = true, features = ["rustls-tls", "native-tls"]}
+reqwest = {workspace = true, features = ["rustls-tls", "native-tls", "stream"]}
 blake3 = {workspace = true}
 tracing = {workspace = true}
 tracing-subscriber = {workspace = true}
@@ -13,3 +13,6 @@ domain = {workspace = true}
 config = {workspace = true}
 scraper = {workspace = true}
 url = {workspace = true}
+storage-client = {workspace = true}
+futures = {workspace = true}
+chrono = {workspace = true}

@@ -1,14 +1,17 @@
-use chrono::{DateTime, Local}; 
+use chrono::{DateTime, Local, Utc};
+use serde::Serialize;
+
 pub struct CrawlJob {
-    url: String,
-    depth: u8 
+    pub url: String,
+    pub depth: u8,
 }
 
+#[derive(Serialize)]
 pub struct UrlMetaData {
-    url: String,
-    location_on_s3: String,
-    last_crawled: DateTime<Local>,
-    content_hash: String,
-    depth: u8
+    pub url: String,
+    pub storage_path: String,
+    pub last_crawled: DateTime<Utc>,
+    pub content_hash: String,
+    pub depth: u8,
 }
 

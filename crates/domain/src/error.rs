@@ -16,5 +16,6 @@ pub enum CrawlerError {
     WrongContentType(String),
     #[error("Network error: {0}")]
     Network(#[from] reqwest::Error),
-
+    #[error("Storage error: {0}")]
+    Storage(String),
 }
