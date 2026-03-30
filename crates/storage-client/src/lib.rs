@@ -39,6 +39,14 @@ impl DiskStorage {
         Ok(path.to_string_lossy().into_owned())
     }
 
+    pub async fn store_parsed(&self, hash: &str, content: &[u8]) -> Result<(), StorageError> {
+        let parsed_dir = self.base_dir.join("parsed");
+        tokio::fs::create_dir_all(&parsed_dir).await?;
+        let path = parsed_dir.join(format!("{hash}.json"));
+        tokio::fs::write(&path, content).await?;
+        Ok(())
+    }
+
     pub async fn save_metadata(&self, metadata: &UrlMetaData) -> Result<(), StorageError> {
         let mut line = serde_json::to_string(metadata)?;
         line.push('\n');

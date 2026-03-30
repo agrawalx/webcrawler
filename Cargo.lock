@@ -262,8 +262,10 @@ dependencies = [
  "config",
  "domain",
  "futures",
+ "parsing-worker",
  "reqwest",
  "scraper",
+ "serde_json",
  "storage-client",
  "tokio",
  "tracing",
@@ -1087,6 +1089,11 @@ dependencies = [
 [[package]]
 name = "parsing-worker"
 version = "0.1.0"
+dependencies = [
+ "scraper",
+ "serde",
+ "url",
+]
 
 [[package]]
 name = "percent-encoding"

@@ -15,3 +15,8 @@ pub struct UrlMetaData {
     pub depth: u8,
 }
 
+pub struct ParseJob {
+    pub url: String,
+    pub storage_path: String,  // where the HTML file lives
+    pub depth: u8,
+}

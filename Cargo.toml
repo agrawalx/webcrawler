@@ -15,8 +15,9 @@ members = [
 domain         = { path = "crates/domain" }
 config         = { path = "crates/config" }
 queue-client   = { path = "crates/queue-client" }
-storage-client = { path = "crates/storage-client" }
-cache-client   = { path = "crates/cache-client" }
+storage-client  = { path = "crates/storage-client" }
+cache-client    = { path = "crates/cache-client" }
+parsing-worker  = { path = "crates/parsing-worker" }
 
 # ── Async runtime ──────────────────────────────────────────────────────────────
 tokio = { version = "1", features = ["full"] }
