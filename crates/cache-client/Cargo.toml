@@ -4,3 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+deadpool-redis = {workspace = true}
+tokio = {workspace = true}
+redis = {workspace = true}
+thiserror = {workspace = true}
+serde_json = {workspace = true}
+rand = {workspace = true}
+uuid = {workspace = true}

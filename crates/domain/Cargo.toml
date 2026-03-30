@@ -8,3 +8,4 @@ serde = {workspace = true, features = ["derive"]}
 chrono = {workspace = true}
 thiserror = {workspace = true}
 reqwest = {workspace = true}
+cache-client = {workspace = true}

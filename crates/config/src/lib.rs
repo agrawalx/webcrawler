@@ -12,6 +12,10 @@ pub struct Settings {
     pub user_agent: String,
     #[serde(default = "default_storage_dir")]
     pub storage_base_dir: String,
+    #[serde(default = "default_req_per_second")]
+    pub req_per_second: u8,
+    #[serde(default = "default_redis_url")]
+    pub redis_url: String
 }
 fn default_timeout_secs() -> u64 {
     15
@@ -25,6 +29,13 @@ fn default_user_agent() -> String {
 fn default_storage_dir() -> String {
     String::from("./crawl-data")
 }
+fn default_req_per_second() -> u8 {
+    1
+}
+fn default_redis_url() -> String {
+    String::from("redis://127.0.0.1:6379")
+}
+
 
 impl Settings {
     pub fn from_env() -> Result<Self, envy::Error> {

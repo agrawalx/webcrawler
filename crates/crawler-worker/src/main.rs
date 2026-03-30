@@ -7,7 +7,7 @@ use domain::models::CrawlJob;
 use reqwest::Client;
 use storage_client::DiskStorage;
 use tokio::sync::{mpsc, oneshot};
-
+use cache_client::RedisClient; 
 mod fetcher;
 mod parser_bridge;
 mod worker;
@@ -31,6 +31,7 @@ async fn main() -> Result<(), error::CrawlerError> {
     );
 
     let seed_urls = vec!["https://example.com", "https://rust-lang.org"];
+    let redis = Arc::new(RedisClient::new(&env_variables.redis_url).await?);
 
     // crawlers → queue actor (push discovered URLs)
     let (push_tx, mut push_rx) = mpsc::channel::<CrawlJob>(1000);
@@ -65,14 +66,12 @@ async fn main() -> Result<(), error::CrawlerError> {
 
     parser_bridge::spawn_parser_actor(parse_rx, push_tx.clone(), Arc::clone(&storage));
 
-    let handles = worker::spawn_workers(4, req_tx, client, storage, parse_tx);
+    let handle = worker::spawn_worker(req_tx, client, storage, parse_tx, redis, env_variables.req_per_second);
 
-    for handle in handles {
-        match handle.await {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => eprintln!("task error: {e}"),
-            Err(e) => eprintln!("task panicked: {e}"),
-        }
+    match handle.await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => eprintln!("task error: {e}"),
+        Err(e) => eprintln!("task panicked: {e}"),
     }
     Ok(())
 }

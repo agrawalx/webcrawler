@@ -12,9 +12,11 @@ tracing-subscriber = {workspace = true}
 domain = {workspace = true}
 config = {workspace = true}
 scraper = {workspace = true}
+cache-client = {workspace = true}
 url = {workspace = true}
 storage-client  = { workspace = true }
 futures         = { workspace = true }
 chrono          = { workspace = true }
 parsing-worker  = { workspace = true }
 serde_json      = { workspace = true }
+rand            = { workspace = true }
