@@ -25,10 +25,3 @@ pub fn extract_url(html: &str, base_url: &str) -> Result<Vec<String>, ParseError
 
     Ok(urls)
 }
-
-/// Strip HTML tags and return plain text. Placeholder until a proper text
-/// extraction pass is implemented.
-pub fn extract_text(html: &str) -> String {
-    let document = Html::parse_document(html);
-    document.root_element().text().collect::<Vec<_>>().join(" ")
-}
