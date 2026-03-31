@@ -39,7 +39,12 @@ async fn main() {
                     };
 
                     let parsed = extractor::parse(&html, &job.url);
-                    println!("parsed: {} ({} words, {} links)", job.url, parsed.word_count, parsed.links.len());
+                    println!(
+                        "parsed: {} ({} words, {} links)",
+                        job.url,
+                        parsed.word_count,
+                        parsed.links.len()
+                    );
 
                     // derive hash from the S3 key stem: "html/{hash}.html" → "{hash}"
                     let hash = std::path::Path::new(&job.storage_path)
@@ -63,7 +68,10 @@ async fn main() {
 
                     // send extracted URLs back to frontier
                     for url in parsed.links {
-                        let crawl_job = CrawlJob { url: url.clone(), depth: job.depth + 1 };
+                        let crawl_job = CrawlJob {
+                            url: url.clone(),
+                            depth: job.depth + 1,
+                        };
                         if let Err(e) = sqs.send_crawl_job(&frontier_url, crawl_job).await {
                             eprintln!("failed to enqueue {url}: {e}");
                         }

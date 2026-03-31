@@ -6,8 +6,8 @@ use domain::error;
 use queue_client::SqsClient;
 use reqwest::Client;
 use storage_client::{DynamoStorage, S3Storage};
-
 mod fetcher;
+mod robots;
 mod worker;
 
 #[tokio::main]

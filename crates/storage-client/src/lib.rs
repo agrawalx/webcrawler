@@ -4,12 +4,12 @@ use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_s3::config::Region;
 use aws_sdk_s3::primitives::ByteStream;
-use domain::models::UrlMetaData;
+use chrono::{DateTime, Utc};
+use domain::models::{DomainRecord, UrlMetaData};
 use std::path::PathBuf;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
-
 #[derive(Debug, thiserror::Error)]
 pub enum StorageError {
     #[error("Failed to write file: {0}")]
@@ -193,6 +193,66 @@ impl DynamoStorage {
             .map_err(|e| StorageError::DynamoDB(e.to_string()))?;
 
         Ok(result.count() > 0)
+    }
+    pub async fn put_domain(&self, record: &DomainRecord) -> Result<(), StorageError> {
+        let disallow_json = serde_json::to_string(&record.disallow)
+            .map_err(|e| StorageError::DynamoDB(e.to_string()))?;
+
+        self.client
+            .put_item()
+            .table_name("CrawlerDomains")
+            .item("domain", AttributeValue::S(record.domain.clone()))
+            .item("disallow", AttributeValue::S(disallow_json))
+            .item(
+                "crawl_delay",
+                AttributeValue::N(record.crawl_delay.unwrap_or(0).to_string()),
+            )
+            .item(
+                "fetched_at",
+                AttributeValue::S(record.fetched_at.to_rfc3339()),
+            )
+            .send()
+            .await
+            .map_err(|e| StorageError::DynamoDB(e.to_string()))?;
+
+        Ok(())
+    }
+
+    pub async fn get_domain(&self, domain: &str) -> Result<Option<DomainRecord>, StorageError> {
+        let result = self
+            .client
+            .get_item()
+            .table_name("CrawlerDomains")
+            .key("domain", AttributeValue::S(domain.to_string()))
+            .send()
+            .await
+            .map_err(|e| StorageError::DynamoDB(e.to_string()))?;
+
+        let item = match result.item() {
+            Some(i) => i,
+            None => return Ok(None),
+        };
+
+        let domain = item["domain"].as_s().unwrap().clone();
+        let disallow: Vec<String> =
+            serde_json::from_str(item["disallow"].as_s().unwrap()).unwrap_or_default();
+        let crawl_delay = item
+            .get("crawl_delay")
+            .and_then(|v| v.as_n().ok())
+            .and_then(|n| n.parse::<u64>().ok())
+            .filter(|&d| d > 0);
+        let fetched_at = item["fetched_at"]
+            .as_s()
+            .unwrap()
+            .parse::<DateTime<Utc>>()
+            .unwrap();
+
+        Ok(Some(DomainRecord {
+            domain,
+            disallow,
+            crawl_delay,
+            fetched_at,
+        }))
     }
 }
 
