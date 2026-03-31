@@ -5,7 +5,7 @@ use config::Settings;
 use domain::error;
 use domain::models::CrawlJob;
 use reqwest::Client;
-use storage_client::DiskStorage;
+use storage_client::{DynamoStorage, S3Storage};
 use tokio::sync::{mpsc, oneshot};
 use cache_client::RedisClient; 
 mod fetcher;
@@ -25,10 +25,10 @@ async fn main() -> Result<(), error::CrawlerError> {
             .expect("failed to build reqwest client"),
     );
     let storage = Arc::new(
-        DiskStorage::new(&env_variables.storage_base_dir)
-            .await
-            .expect("failed to create storage dir"),
+        S3Storage::new(&env_variables.s3_bucket, &env_variables.aws_region).await
     );
+
+    let dynamo_storage = Arc::new(DynamoStorage::new("UrlMetadata", &env_variables.aws_region).await);
 
     let seed_urls = vec!["https://example.com", "https://rust-lang.org"];
     let redis = Arc::new(RedisClient::new(&env_variables.redis_url).await?);
@@ -66,7 +66,7 @@ async fn main() -> Result<(), error::CrawlerError> {
 
     parser_bridge::spawn_parser_actor(parse_rx, push_tx.clone(), Arc::clone(&storage));
 
-    let handle = worker::spawn_worker(req_tx, client, storage, parse_tx, redis, env_variables.req_per_second);
+    let handle = worker::spawn_worker(req_tx, client, Arc::clone(&storage),Arc::clone(&dynamo_storage),  parse_tx, redis, env_variables.req_per_second);
 
     match handle.await {
         Ok(Ok(())) => {}

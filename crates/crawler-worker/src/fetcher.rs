@@ -1,12 +1,12 @@
 use domain::error::CrawlerError;
 use futures::StreamExt;
 use reqwest::Client;
-use storage_client::DiskStorage;
+use storage_client::S3Storage;
 
 pub async fn fetch(
     client: &Client,
     url: &str,
-    storage: &DiskStorage,
+    storage: &S3Storage,
 ) -> Result<(String, String, String), CrawlerError> {
     let response = client.get(url).send().await?;
     let mut stream = response.bytes_stream();

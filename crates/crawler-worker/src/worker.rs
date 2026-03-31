@@ -6,18 +6,19 @@ use domain::{
     error::CrawlerError,
     models::{CrawlJob, ParseJob, UrlMetaData},
 };
+use rand::Rng;
 use reqwest::Client;
-use storage_client::DiskStorage;
+use storage_client::{DynamoStorage, S3Storage};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
-use rand::Rng;
 use tokio::time::Duration;
 use url::Url;
 
 pub fn spawn_worker(
     req_tx: mpsc::Sender<oneshot::Sender<Option<CrawlJob>>>,
     client: Arc<Client>,
-    storage: Arc<DiskStorage>,
+    s3: Arc<S3Storage>,
+    dynamo: Arc<DynamoStorage>,
     parse_tx: mpsc::Sender<ParseJob>,
     redis: Arc<RedisClient>,
     req_per_second: u8,
@@ -30,12 +31,11 @@ pub fn spawn_worker(
             match resp_rx.await.expect("queue actor dropped") {
                 Some(job) => {
                     let client = Arc::clone(&client);
-                    let storage = Arc::clone(&storage);
+                    let s3 = Arc::clone(&s3);
+                    let dynamo = Arc::clone(&dynamo);
                     let parse_tx = parse_tx.clone();
                     let redis = Arc::clone(&redis);
 
-                    // Spawn the full pipeline — rate limit, fetch, write, parse.
-                    // The dispatcher loop immediately continues to the next job.
                     tokio::task::spawn(async move {
                         let domain = extract_domain(&job.url);
                         loop {
@@ -52,7 +52,7 @@ pub fn spawn_worker(
                             }
                         }
 
-                        match crate::fetcher::fetch(&client, &job.url, &storage).await {
+                        match crate::fetcher::fetch(&client, &job.url, &s3).await {
                             Ok((_html, hash, storage_path)) => {
                                 println!("{} depth={} -> {hash}", job.url, job.depth);
                                 let metadata = UrlMetaData {
@@ -62,7 +62,7 @@ pub fn spawn_worker(
                                     content_hash: hash,
                                     depth: job.depth,
                                 };
-                                if let Err(e) = storage.save_metadata(&metadata).await {
+                                if let Err(e) = dynamo.put_item(&metadata).await {
                                     eprintln!("metadata save failed for {}: {e}", job.url);
                                 }
                                 let _ = parse_tx

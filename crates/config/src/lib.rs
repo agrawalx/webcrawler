@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use serde::Deserialize; 
 #[derive(Debug, Deserialize)]
-
 pub struct Settings {
     #[serde(default = "default_timeout_secs")]
     pub time_out_duration: u64,
@@ -15,7 +14,11 @@ pub struct Settings {
     #[serde(default = "default_req_per_second")]
     pub req_per_second: u8,
     #[serde(default = "default_redis_url")]
-    pub redis_url: String
+    pub redis_url: String,
+    #[serde(default = "default_bucket")]
+    pub s3_bucket: String,
+    #[serde(default = "default_region")]
+    pub aws_region: String,
 }
 fn default_timeout_secs() -> u64 {
     15
@@ -35,7 +38,13 @@ fn default_req_per_second() -> u8 {
 fn default_redis_url() -> String {
     String::from("redis://127.0.0.1:6379")
 }
+fn default_bucket() -> String {
+    String::from("webcrawler-yash-test") 
+}
 
+fn default_region() -> String {
+    String::from("ap-south-1")
+}
 
 impl Settings {
     pub fn from_env() -> Result<Self, envy::Error> {

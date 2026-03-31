@@ -1,9 +1,14 @@
 use std::path::PathBuf;
-
 use domain::models::UrlMetaData;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
+use aws_sdk_s3::config::Region; 
+use aws_sdk_s3::primitives::ByteStream; 
+use aws_config::meta::region::RegionProviderChain; 
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_dynamodb::Client as DynamoClient;
+use aws_sdk_dynamodb::types::AttributeValue;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StorageError {
@@ -11,6 +16,10 @@ pub enum StorageError {
     WriteError(#[from] std::io::Error),
     #[error("Failed to serialize metadata: {0}")]
     SerializeError(#[from] serde_json::Error),
+    #[error("S3 error: {0}")]
+    S3(String),
+    #[error("DynamoDB error: {0}")]
+    DynamoDB(String),
 }
 
 pub struct DiskStorage {
@@ -55,4 +64,164 @@ impl DiskStorage {
         file.flush().await?;
         Ok(())
     }
+}
+
+pub struct S3Storage {
+    client: S3Client,
+    bucket: String,
+}
+
+impl S3Storage {
+    pub async fn new(bucket: &str, region: &str) -> Self {
+        let region_provider = RegionProviderChain::first_try(Region::new(region.to_string()))
+            .or_default_provider()
+            .or_else(Region::new("ap-south-1"));
+
+        let config = aws_config::from_env()
+            .region(region_provider)
+            .load()
+            .await;
+
+        Self {
+            client: S3Client::new(&config),
+            bucket: bucket.to_string(),
+        }
+    }
+
+    pub async fn store_html(&self, hash: &str, content: &[u8]) -> Result<String, StorageError> {
+        let key = format!("html/{hash}.html");
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .body(ByteStream::from(content.to_vec()))
+            .content_type("text/html")
+            .send()
+            .await
+            .map_err(|e| StorageError::S3(e.to_string()))?;
+        Ok(key)
+    }
+
+    pub async fn get_html(&self, key: &str) -> Result<String, StorageError> {
+        let output = self.client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await
+            .map_err(|e| StorageError::S3(e.to_string()))?;
+        let bytes = output.body.collect().await
+            .map_err(|e| StorageError::S3(e.to_string()))?
+            .into_bytes();
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    pub async fn store_parsed(&self, hash: &str, content: &[u8]) -> Result<(), StorageError> {
+        let key = format!("parsed/{hash}.json");
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .body(ByteStream::from(content.to_vec()))
+            .content_type("application/json")
+            .send()
+            .await
+            .map_err(|e| StorageError::S3(e.to_string()))?;
+        Ok(())
+    }
+}
+
+pub struct DynamoStorage {
+    client: DynamoClient,
+    table_name: String,
+}
+
+impl DynamoStorage {
+    pub async fn new(table_name: &str, region: &str) -> Self {
+        // same pattern as S3Storage::new()
+        // look up aws_config::from_env().region(...).load().await
+        let region_provider = RegionProviderChain::first_try(Region::new(region.to_string()))
+            .or_default_provider()
+            .or_else(Region::new("ap-south-1"));
+
+        let config = aws_config::from_env()
+            .region(region_provider)
+            .load()
+            .await;
+
+        Self {
+            client: DynamoClient::new(&config),
+            table_name: table_name.to_string(),
+        }
+    }
+
+    pub async fn put_item(&self, metadata: &UrlMetaData) -> Result<(), StorageError> {
+        self.client
+            .put_item()
+            .table_name(&self.table_name)
+            .item("url", AttributeValue::S(metadata.url.clone()))
+            .item("content_hash", AttributeValue::S(metadata.content_hash.clone()))
+            .item("storage_path", AttributeValue::S(metadata.storage_path.clone()))
+            .item("last_crawled", AttributeValue::S(metadata.last_crawled.to_rfc3339()))
+            .item("depth", AttributeValue::N(metadata.depth.to_string()))
+            .send()
+            .await
+            .map_err(|e| StorageError::DynamoDB(e.to_string()))?;
+
+        Ok(())
+    }
+
+    pub async fn hash_exists(&self, hash: &str) -> Result<bool, StorageError> {
+        let result = self.client
+            .query()
+            .table_name(&self.table_name)
+            .index_name("hash-index")    // GSI you created
+            .key_condition_expression("#h = :hash")
+            .expression_attribute_names("#h", "content_hash")
+            .expression_attribute_values(":hash", AttributeValue::S(hash.to_string()))
+            .limit(1)                    // only need to know if one exists
+            .send()
+            .await
+            .map_err(|e| StorageError::DynamoDB(e.to_string()))?;
+
+        Ok(result.count() > 0)
+    }
+
+}
+
+#[tokio::test]
+async fn test_s3_upload() {
+    let storage = S3Storage::new("webcrawler-yash-test", "ap-south-1").await;
+    let result = storage.store_html("testhash123", b"<html>test</html>").await;
+    println!("{:?}", result);
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_dynamo() {
+    use chrono::Utc;
+    
+    let storage = DynamoStorage::new("UrlMetadata", "ap-south-1").await;
+    
+    let metadata = UrlMetaData {
+        url: String::from("https://example.com"),
+        content_hash: String::from("testhash123"),
+        storage_path: String::from("html/testhash123.html"),
+        last_crawled: Utc::now(),
+        depth: 0,
+    };
+
+    // test put
+    let put = storage.put_item(&metadata).await;
+    println!("put: {:?}", put);
+    assert!(put.is_ok());
+
+    // test hash exists
+    let exists = storage.hash_exists("testhash123").await;
+    println!("exists: {:?}", exists);
+    assert!(exists.unwrap() == true);
+
+    // test hash not exists
+    let not_exists = storage.hash_exists("doesnotexist").await;
+    assert!(not_exists.unwrap() == false);
 }
