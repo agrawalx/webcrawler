@@ -1,2 +1,2 @@
-pub mod parser;
 pub mod extractor;
+pub mod parser;

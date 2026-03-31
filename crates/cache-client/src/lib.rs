@@ -1,5 +1,5 @@
-pub mod error; 
-use error::CacheError; 
+pub mod error;
+use error::CacheError;
 #[derive(Clone)]
 pub struct RedisClient {
     pool: deadpool_redis::Pool,
@@ -13,8 +13,9 @@ impl RedisClient {
     }
 
     pub async fn check_rate_limit(&self, domain: &str, limit: u8) -> Result<bool, CacheError> {
-        let mut conn = self.pool.get().await?;  
-        let script = redis::Script::new(r#"
+        let mut conn = self.pool.get().await?;
+        let script = redis::Script::new(
+            r#"
             local key = KEYS[1]
             local now = tonumber(ARGV[1])
             local window = tonumber(ARGV[2])
@@ -31,7 +32,8 @@ impl RedisClient {
             else
                 return 0
             end
-        "#);
+        "#,
+        );
         let key = format!("rate_limit:{domain}");
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -41,10 +43,10 @@ impl RedisClient {
 
         let result: i32 = script
             .key(&key)
-            .arg(now)        // ARGV[1]: current timestamp ms
-            .arg(1000u64)    // ARGV[2]: window size (1 second)
-            .arg(limit)      // ARGV[3]: max requests
-            .arg(&id)        // ARGV[4]: unique request id
+            .arg(now) // ARGV[1]: current timestamp ms
+            .arg(1000u64) // ARGV[2]: window size (1 second)
+            .arg(limit) // ARGV[3]: max requests
+            .arg(&id) // ARGV[4]: unique request id
             .invoke_async(&mut *conn)
             .await?;
 

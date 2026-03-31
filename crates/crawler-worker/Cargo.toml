@@ -20,3 +20,4 @@ chrono          = { workspace = true }
 parsing-worker  = { workspace = true }
 serde_json      = { workspace = true }
 rand            = { workspace = true }
+queue-client    = { workspace = true }

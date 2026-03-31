@@ -19,5 +19,5 @@ pub enum CrawlerError {
     #[error("Storage error: {0}")]
     Storage(String),
     #[error("Storage error: {0}")]
-    Cache(#[from] cache_client::error::CacheError)
+    Cache(#[from] cache_client::error::CacheError),
 }

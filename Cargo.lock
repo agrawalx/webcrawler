@@ -274,6 +274,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-sqs"
+version = "1.97.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d497fb382b906b04167e62848ad00e56c5ad523791a461d5a5611c186531d81"
+dependencies = [
+ "aws-credential-types",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-observability",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
+ "fastrand",
+ "http 0.2.12",
+ "http 1.4.0",
+ "regex-lite",
+ "tracing",
+]
+
+[[package]]
 name = "aws-sdk-sso"
 version = "1.97.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -852,6 +876,7 @@ dependencies = [
  "domain",
  "futures",
  "parsing-worker",
+ "queue-client",
  "rand 0.8.5",
  "reqwest",
  "scraper",
@@ -2187,8 +2212,14 @@ dependencies = [
 name = "parsing-worker"
 version = "0.1.0"
 dependencies = [
+ "config",
+ "domain",
+ "queue-client",
  "scraper",
  "serde",
+ "serde_json",
+ "storage-client",
+ "tokio",
  "url",
 ]
 
@@ -2330,6 +2361,15 @@ dependencies = [
 [[package]]
 name = "queue-client"
 version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-sqs",
+ "domain",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
 
 [[package]]
 name = "quinn"
@@ -2785,6 +2825,12 @@ dependencies = [
 [[package]]
 name = "seed-loader"
 version = "0.1.0"
+dependencies = [
+ "config",
+ "domain",
+ "queue-client",
+ "tokio",
+]
 
 [[package]]
 name = "selectors"

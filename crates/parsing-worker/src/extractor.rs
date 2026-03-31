@@ -22,7 +22,14 @@ pub fn parse(html: &str, url: &str) -> ParsedPage {
     let links = extract_url(html, url).unwrap_or_default();
     let word_count = body_text.split_whitespace().count();
 
-    ParsedPage { url: url.to_string(), title, description, body_text, links, word_count }
+    ParsedPage {
+        url: url.to_string(),
+        title,
+        description,
+        body_text,
+        links,
+        word_count,
+    }
 }
 
 fn extract_title(document: &Html) -> Option<String> {
@@ -54,10 +61,7 @@ fn extract_body_text(document: &Html) -> String {
         None => return String::new(),
     };
 
-    let noisy_ids: std::collections::HashSet<_> = body
-        .select(&noise)
-        .map(|el| el.id())
-        .collect();
+    let noisy_ids: std::collections::HashSet<_> = body.select(&noise).map(|el| el.id()).collect();
 
     body.descendants()
         .filter_map(|node| {

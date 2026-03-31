@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+tokio        = { workspace = true }
+config       = { workspace = true }
+domain       = { workspace = true }
+queue-client = { workspace = true }

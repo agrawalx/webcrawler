@@ -39,7 +39,12 @@ pub fn spawn_parser_actor(
                 }
 
                 for url in parsed.links {
-                    let _ = push_tx.send(CrawlJob { url, depth: job.depth + 1 }).await;
+                    let _ = push_tx
+                        .send(CrawlJob {
+                            url,
+                            depth: job.depth + 1,
+                        })
+                        .await;
                 }
             });
         }

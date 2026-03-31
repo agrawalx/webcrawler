@@ -1,14 +1,14 @@
-use std::path::PathBuf;
+use aws_config::meta::region::RegionProviderChain;
+use aws_sdk_dynamodb::Client as DynamoClient;
+use aws_sdk_dynamodb::types::AttributeValue;
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::config::Region;
+use aws_sdk_s3::primitives::ByteStream;
 use domain::models::UrlMetaData;
+use std::path::PathBuf;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
-use aws_sdk_s3::config::Region; 
-use aws_sdk_s3::primitives::ByteStream; 
-use aws_config::meta::region::RegionProviderChain; 
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_dynamodb::Client as DynamoClient;
-use aws_sdk_dynamodb::types::AttributeValue;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StorageError {
@@ -77,10 +77,7 @@ impl S3Storage {
             .or_default_provider()
             .or_else(Region::new("ap-south-1"));
 
-        let config = aws_config::from_env()
-            .region(region_provider)
-            .load()
-            .await;
+        let config = aws_config::from_env().region(region_provider).load().await;
 
         Self {
             client: S3Client::new(&config),
@@ -103,14 +100,18 @@ impl S3Storage {
     }
 
     pub async fn get_html(&self, key: &str) -> Result<String, StorageError> {
-        let output = self.client
+        let output = self
+            .client
             .get_object()
             .bucket(&self.bucket)
             .key(key)
             .send()
             .await
             .map_err(|e| StorageError::S3(e.to_string()))?;
-        let bytes = output.body.collect().await
+        let bytes = output
+            .body
+            .collect()
+            .await
             .map_err(|e| StorageError::S3(e.to_string()))?
             .into_bytes();
         Ok(String::from_utf8_lossy(&bytes).into_owned())
@@ -144,10 +145,7 @@ impl DynamoStorage {
             .or_default_provider()
             .or_else(Region::new("ap-south-1"));
 
-        let config = aws_config::from_env()
-            .region(region_provider)
-            .load()
-            .await;
+        let config = aws_config::from_env().region(region_provider).load().await;
 
         Self {
             client: DynamoClient::new(&config),
@@ -160,9 +158,18 @@ impl DynamoStorage {
             .put_item()
             .table_name(&self.table_name)
             .item("url", AttributeValue::S(metadata.url.clone()))
-            .item("content_hash", AttributeValue::S(metadata.content_hash.clone()))
-            .item("storage_path", AttributeValue::S(metadata.storage_path.clone()))
-            .item("last_crawled", AttributeValue::S(metadata.last_crawled.to_rfc3339()))
+            .item(
+                "content_hash",
+                AttributeValue::S(metadata.content_hash.clone()),
+            )
+            .item(
+                "storage_path",
+                AttributeValue::S(metadata.storage_path.clone()),
+            )
+            .item(
+                "last_crawled",
+                AttributeValue::S(metadata.last_crawled.to_rfc3339()),
+            )
             .item("depth", AttributeValue::N(metadata.depth.to_string()))
             .send()
             .await
@@ -172,27 +179,29 @@ impl DynamoStorage {
     }
 
     pub async fn hash_exists(&self, hash: &str) -> Result<bool, StorageError> {
-        let result = self.client
+        let result = self
+            .client
             .query()
             .table_name(&self.table_name)
-            .index_name("hash-index")    // GSI you created
+            .index_name("hash-index") // GSI you created
             .key_condition_expression("#h = :hash")
             .expression_attribute_names("#h", "content_hash")
             .expression_attribute_values(":hash", AttributeValue::S(hash.to_string()))
-            .limit(1)                    // only need to know if one exists
+            .limit(1) // only need to know if one exists
             .send()
             .await
             .map_err(|e| StorageError::DynamoDB(e.to_string()))?;
 
         Ok(result.count() > 0)
     }
-
 }
 
 #[tokio::test]
 async fn test_s3_upload() {
     let storage = S3Storage::new("webcrawler-yash-test", "ap-south-1").await;
-    let result = storage.store_html("testhash123", b"<html>test</html>").await;
+    let result = storage
+        .store_html("testhash123", b"<html>test</html>")
+        .await;
     println!("{:?}", result);
     assert!(result.is_ok());
 }
@@ -200,9 +209,9 @@ async fn test_s3_upload() {
 #[tokio::test]
 async fn test_dynamo() {
     use chrono::Utc;
-    
+
     let storage = DynamoStorage::new("UrlMetadata", "ap-south-1").await;
-    
+
     let metadata = UrlMetaData {
         url: String::from("https://example.com"),
         content_hash: String::from("testhash123"),

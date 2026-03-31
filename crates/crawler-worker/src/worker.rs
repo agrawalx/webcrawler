@@ -4,36 +4,42 @@ use cache_client::RedisClient;
 use chrono::Utc;
 use domain::{
     error::CrawlerError,
-    models::{CrawlJob, ParseJob, UrlMetaData},
+    models::{ParseJob, UrlMetaData},
 };
+use queue_client::SqsClient;
 use rand::Rng;
 use reqwest::Client;
 use storage_client::{DynamoStorage, S3Storage};
-use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::Duration;
 use url::Url;
 
 pub fn spawn_worker(
-    req_tx: mpsc::Sender<oneshot::Sender<Option<CrawlJob>>>,
-    client: Arc<Client>,
+    http: Arc<Client>,
     s3: Arc<S3Storage>,
     dynamo: Arc<DynamoStorage>,
-    parse_tx: mpsc::Sender<ParseJob>,
+    sqs: Arc<SqsClient>,
+    frontier_queue_url: String,
+    parsing_queue_url: String,
     redis: Arc<RedisClient>,
     req_per_second: u8,
 ) -> JoinHandle<Result<(), CrawlerError>> {
     tokio::task::spawn(async move {
         loop {
-            let (resp_tx, resp_rx) = oneshot::channel();
-            req_tx.send(resp_tx).await.expect("queue actor dropped");
-
-            match resp_rx.await.expect("queue actor dropped") {
-                Some(job) => {
-                    let client = Arc::clone(&client);
+            // Long-poll SQS for the next CrawlJob (blocks up to 20s if empty)
+            match sqs.receive_crawl_job(&frontier_queue_url).await {
+                Err(e) => {
+                    eprintln!("SQS receive error: {e}");
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                }
+                Ok(None) => {} // queue empty, loop and poll again
+                Ok(Some((job, receipt))) => {
+                    let http = Arc::clone(&http);
                     let s3 = Arc::clone(&s3);
                     let dynamo = Arc::clone(&dynamo);
-                    let parse_tx = parse_tx.clone();
+                    let sqs = Arc::clone(&sqs);
+                    let frontier_queue_url = frontier_queue_url.clone();
+                    let parsing_queue_url = parsing_queue_url.clone();
                     let redis = Arc::clone(&redis);
 
                     tokio::task::spawn(async move {
@@ -52,9 +58,10 @@ pub fn spawn_worker(
                             }
                         }
 
-                        match crate::fetcher::fetch(&client, &job.url, &s3).await {
+                        match crate::fetcher::fetch(&http, &job.url, &s3).await {
                             Ok((_html, hash, storage_path)) => {
                                 println!("{} depth={} -> {hash}", job.url, job.depth);
+
                                 let metadata = UrlMetaData {
                                     url: job.url.clone(),
                                     storage_path: storage_path.clone(),
@@ -65,20 +72,24 @@ pub fn spawn_worker(
                                 if let Err(e) = dynamo.put_item(&metadata).await {
                                     eprintln!("metadata save failed for {}: {e}", job.url);
                                 }
-                                let _ = parse_tx
-                                    .send(ParseJob {
-                                        url: job.url,
-                                        storage_path,
-                                        depth: job.depth,
-                                    })
-                                    .await;
+
+                                // delete from frontier only after successful fetch + metadata save
+                                if let Err(e) = sqs.delete_message(&frontier_queue_url, &receipt).await {
+                                    eprintln!("failed to delete SQS message for {}: {e}", job.url);
+                                }
+
+                                let parse_job = ParseJob {
+                                    url: job.url.clone(),
+                                    storage_path,
+                                    depth: job.depth,
+                                };
+                                if let Err(e) = sqs.send_parse_job(&parsing_queue_url, parse_job).await {
+                                    eprintln!("failed to enqueue ParseJob for {}: {e}", job.url);
+                                }
                             }
                             Err(e) => eprintln!("fetch failed for {}: {e}", job.url),
                         }
                     });
-                }
-                None => {
-                    tokio::time::sleep(Duration::from_millis(100)).await;
                 }
             }
         }

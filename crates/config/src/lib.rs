@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use serde::Deserialize; 
+use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     #[serde(default = "default_timeout_secs")]
@@ -19,7 +19,14 @@ pub struct Settings {
     pub s3_bucket: String,
     #[serde(default = "default_region")]
     pub aws_region: String,
+    #[serde(default = "default_frontier_url")]
+    pub frontier_queue_url: String,
+    #[serde(default = "default_parsing_url")]
+    pub parsing_queue_url: String,
+    #[serde(default = "default_dlq_url")]
+    pub frontier_dlq_url: String,
 }
+
 fn default_timeout_secs() -> u64 {
     15
 }
@@ -39,11 +46,23 @@ fn default_redis_url() -> String {
     String::from("redis://127.0.0.1:6379")
 }
 fn default_bucket() -> String {
-    String::from("webcrawler-yash-test") 
+    String::from("webcrawler-yash-test")
 }
 
 fn default_region() -> String {
     String::from("ap-south-1")
+}
+
+fn default_dlq_url() -> String {
+    String::from("https://sqs.ap-south-1.amazonaws.com/885232248981/crawler-frontier-dlq")
+}
+
+fn default_frontier_url() -> String {
+    String::from("https://sqs.ap-south-1.amazonaws.com/885232248981/crawler-frontier")
+}
+
+fn default_parsing_url() -> String {
+    String::from("https://sqs.ap-south-1.amazonaws.com/885232248981/crawler-parsing")
 }
 
 impl Settings {
